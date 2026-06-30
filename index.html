@@ -40,46 +40,45 @@
     }).addTo(map);
 
     // =========================
-    // ORTOFOTOMAPA — WMTS Geoportal ✅
+    // ORTOFOTOMAPA — WMS Geoportal (v1.3.0 + EPSG:3857) ✅
     // =========================
-    var orto = L.tileLayer(
-        'https://mapy.geoportal.gov.pl/wss/service/WMTS/guest/wmts/ORTO?' +
-        'SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0' +
-        '&LAYER=ORTOFOTOMAPA&TILEMATRIXSET=EPSG:3857' +
-        '&TILEMATRIX=EPSG:3857:{z}&TILECOL={x}&TILEROW={y}' +
-        '&FORMAT=image/jpeg',
+    var orto = L.tileLayer.wms(
+        'https://mapy.geoportal.gov.pl/wss/service/img/guest/ORTO/MapServer/WMSServer',
         {
+            layers: 'Raster',
+            format: 'image/jpeg',
+            transparent: false,
+            version: '1.3.0',
             attribution: 'Geoportal.gov.pl',
             maxZoom: 20
         }
     );
 
     // =========================
-    // DZIAŁKI EWIDENCYJNE — WMTS ✅
+    // DZIAŁKI EWIDENCYJNE (KIEG) — WMS ✅
     // =========================
-    var dzialki = L.tileLayer(
-        'https://mapy.geoportal.gov.pl/wss/service/WMTS/guest/wmts/G2_DZIALKI?' +
-        'SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0' +
-        '&LAYER=G2_DZIALKI_WMTS&TILEMATRIXSET=EPSG:3857' +
-        '&TILEMATRIX=EPSG:3857:{z}&TILECOL={x}&TILEROW={y}' +
-        '&FORMAT=image/png',
+    var dzialki = L.tileLayer.wms(
+        'https://integracja.gugik.gov.pl/cgi-bin/KrajowaIntegracjaEwidencjiGruntow',
         {
+            layers: 'dzialki,numery_dzialek',
+            format: 'image/png',
+            transparent: true,
+            version: '1.3.0',
             attribution: 'Geoportal.gov.pl',
-            maxZoom: 20,
-            opacity: 0.8
+            maxZoom: 20
         }
     );
 
     // =========================
-    // BUDYNKI — WMTS ✅
+    // BUDYNKI (BDOT10k) — WMS ✅
     // =========================
-    var budynki = L.tileLayer(
-        'https://mapy.geoportal.gov.pl/wss/service/WMTS/guest/wmts/BDOT10k?' +
-        'SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0' +
-        '&LAYER=BDOT10k&TILEMATRIXSET=EPSG:3857' +
-        '&TILEMATRIX=EPSG:3857:{z}&TILECOL={x}&TILEROW={y}' +
-        '&FORMAT=image/png',
+    var budynki = L.tileLayer.wms(
+        'https://mapy.geoportal.gov.pl/wss/service/PZGIK/BDOT10k/WMS/MapaTopograficzna',
         {
+            layers: 'Raster',
+            format: 'image/png',
+            transparent: true,
+            version: '1.3.0',
             attribution: 'Geoportal.gov.pl',
             maxZoom: 20,
             opacity: 0.7
@@ -93,12 +92,12 @@
         },
         {
             "Działki": dzialki,
-            "Budynki (BDOT10k)": budynki
+            "Topo / Budynki (BDOT10k)": budynki
         }
     ).addTo(map);
 
     // =========================
-    // MARKER
+    // MARKER + FORMULARZ
     // =========================
     var marker;
     function ustawMarkerNaMapie(lat, lng) {
