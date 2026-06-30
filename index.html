@@ -3,96 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <title>Mapa Geoportal</title>
-
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
     <style>
         body { margin:0; }
-        #map { height:100vh; }
-
+        #map { height:100vh; background:#eee; }
         #panel {
-            position: absolute;
-            top: 10px;
-            left: 140px;
-            z-index: 1000;
-            background: white;
-            padding: 10px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            position: absolute; top: 10px; left: 60px;
+            z-index: 1000; background: white; padding: 10px;
+            border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.2);
         }
-
-        #panel input {
-            width: 120px;
-            margin-bottom: 5px;
-        }
-
-        #panel button {
-            width: 100%;
-        }
+        #panel input { width: 140px; margin-bottom: 5px; }
+        #panel button { width: 100%; }
     </style>
 </head>
 <body>
 
 <div id="panel">
-    <div><b>Wprowadź współrzędne</b></div>
+    <b>Wprowadź współrzędne</b><br>
     <input id="lat" type="text" placeholder="Lat">
-    <br>
     <input id="lng" type="text" placeholder="Lng">
-    <br>
     <button onclick="ustawMarker()">Pokaż</button>
 </div>
 
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script>
-    var map = L.map('map').setView([52.1, 17.0], 6);
+    var map = L.map('map').setView([52.4, 16.9], 13);
 
     // =========================
-    // WARSTWY
+    // OSM (bazowa)
     // =========================
-    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap',
+        maxZoom: 19
+    }).addTo(map);
 
-    var orto = L.tileLayer.wms(
-        'https://mapy.geoportal.gov.pl/wss/service/PZGIK/ORTO/WMS/StandardResolution',
+    // =========================
+    // ORTOFOTOMAPA — WMTS Geoportal ✅
+    // =========================
+    var orto = L.tileLayer(
+        'https://mapy.geoportal.gov.pl/wss/service/WMTS/guest/wmts/ORTO?' +
+        'SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0' +
+        '&LAYER=ORTOFOTOMAPA&TILEMATRIXSET=EPSG:3857' +
+        '&TILEMATRIX=EPSG:3857:{z}&TILECOL={x}&TILEROW={y}' +
+        '&FORMAT=image/jpeg',
         {
-            layers: 'ORTOFOTOMAPA',
-            format: 'image/png'
+            attribution: 'Geoportal.gov.pl',
+            maxZoom: 20
         }
     );
 
-    // ✅ DZIAŁKI (EGiB)
-    var dzialki = L.tileLayer.wms(
-        'https://mapy.geoportal.gov.pl/wss/service/PZGIK/KrajowaIntegracjaEwidencjiGruntow',
+    // =========================
+    // DZIAŁKI EWIDENCYJNE — WMTS ✅
+    // =========================
+    var dzialki = L.tileLayer(
+        'https://mapy.geoportal.gov.pl/wss/service/WMTS/guest/wmts/G2_DZIALKI?' +
+        'SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0' +
+        '&LAYER=G2_DZIALKI_WMTS&TILEMATRIXSET=EPSG:3857' +
+        '&TILEMATRIX=EPSG:3857:{z}&TILECOL={x}&TILEROW={y}' +
+        '&FORMAT=image/png',
         {
-            layers: 'dzialki',
-            format: 'image/png',
-            transparent: true
+            attribution: 'Geoportal.gov.pl',
+            maxZoom: 20,
+            opacity: 0.8
         }
     );
 
-    // ✅ BUDYNKI
-    var budynki = L.tileLayer.wms(
-        'https://mapy.geoportal.gov.pl/wss/service/PZGIK/KrajowaIntegracjaEwidencjiGruntow',
+    // =========================
+    // BUDYNKI — WMTS ✅
+    // =========================
+    var budynki = L.tileLayer(
+        'https://mapy.geoportal.gov.pl/wss/service/WMTS/guest/wmts/BDOT10k?' +
+        'SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0' +
+        '&LAYER=BDOT10k&TILEMATRIXSET=EPSG:3857' +
+        '&TILEMATRIX=EPSG:3857:{z}&TILECOL={x}&TILEROW={y}' +
+        '&FORMAT=image/png',
         {
-            layers: 'budynki',
-            format: 'image/png',
-            transparent: true
+            attribution: 'Geoportal.gov.pl',
+            maxZoom: 20,
+            opacity: 0.7
         }
     );
-
-    // ✅ GRANICE (opcjonalnie)
-    var granice = L.tileLayer.wms(
-        'https://mapy.geoportal.gov.pl/wss/service/PZGIK/PRG/WMS',
-        {
-            layers: 'A03_Granice_gmin',
-            format: 'image/png',
-            transparent: true
-        }
-    );
-
-    osm.addTo(map);
 
     L.control.layers(
         {
@@ -101,8 +93,7 @@
         },
         {
             "Działki": dzialki,
-            "Budynki": budynki,
-            "Granice gmin": granice
+            "Budynki (BDOT10k)": budynki
         }
     ).addTo(map);
 
@@ -110,50 +101,25 @@
     // MARKER
     // =========================
     var marker;
-
     function ustawMarkerNaMapie(lat, lng) {
-
-        lat = parseFloat(lat);
-        lng = parseFloat(lng);
-
-        if (isNaN(lat) || isNaN(lng)) {
-            alert("Niepoprawne współrzędne!");
-            return;
-        }
-
-        if (marker) {
-            map.removeLayer(marker);
-        }
-
+        lat = parseFloat(lat); lng = parseFloat(lng);
+        if (isNaN(lat) || isNaN(lng)) { alert("Niepoprawne współrzędne!"); return; }
+        if (marker) map.removeLayer(marker);
         marker = L.marker([lat, lng]).addTo(map);
-
-        marker.bindPopup(
-            "<b>Współrzędne:</b><br>" +
-            "Lat: " + lat.toFixed(6) + "<br>" +
-            "Lng: " + lng.toFixed(6)
-        ).openPopup();
-
-        map.setView([lat, lng], 17);
+        marker.bindPopup("Lat: "+lat.toFixed(6)+"<br>Lng: "+lng.toFixed(6)).openPopup();
+        map.setView([lat, lng], 18);
     }
-
     map.on('click', function(e) {
-        var lat = e.latlng.lat.toFixed(6);
-        var lng = e.latlng.lng.toFixed(6);
-
-        document.getElementById("lat").value = lat;
-        document.getElementById("lng").value = lng;
-
-        ustawMarkerNaMapie(lat, lng);
+        document.getElementById("lat").value = e.latlng.lat.toFixed(6);
+        document.getElementById("lng").value = e.latlng.lng.toFixed(6);
+        ustawMarkerNaMapie(e.latlng.lat, e.latlng.lng);
     });
-
     function ustawMarker() {
-        var lat = document.getElementById("lat").value;
-        var lng = document.getElementById("lng").value;
-
-        ustawMarkerNaMapie(lat, lng);
+        ustawMarkerNaMapie(
+            document.getElementById("lat").value,
+            document.getElementById("lng").value
+        );
     }
-
 </script>
-
 </body>
 </html>
