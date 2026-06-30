@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<title>Mapa iMapLite + warstwy</title>
+<title>Mapa iMapLite — ORTO/TOPO + numery adresowe</title>
 <style>
 body { margin:0; font-family: sans-serif; }
 #panel {
@@ -11,7 +11,7 @@ body { margin:0; font-family: sans-serif; }
     border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.2);
     width: 280px;
 }
-#panel input { width: 100%; box-sizing: border-box; margin-bottom: 5px; padding: 4px; }
+#panel input[type="text"] { width: 100%; box-sizing: border-box; margin-bottom: 5px; padding: 4px; }
 #panel button { width: 100%; padding: 4px; cursor: pointer; }
 #panel hr { margin: 10px 0; border: none; border-top: 1px solid #ddd; }
 #suggestions {
@@ -27,25 +27,46 @@ body { margin:0; font-family: sans-serif; }
 #suggestions .empty { color: #777; cursor: default; }
 #suggestions .err   { color: #900; cursor: default; }
 #info { font-size: 12px; color: #555; margin-top: 5px; }
+.basemap-row { display:flex; gap:6px; margin-bottom:6px; }
+.basemap-row label {
+    flex:1; text-align:center; font-size:12px;
+    padding:6px 0; border:1px solid #ccc; border-radius:4px;
+    cursor:pointer; background:#fafafa;
+}
+.basemap-row input { display:none; }
+.basemap-row label:has(input:checked) {
+    background:#1976d2; border-color:#1976d2; color:white;
+}
 </style>
-
-<script src="https://mapy.geoportal.gov.pl/iMapLite/api/cdn/2.0.0/imgp-map/imap-lite-api.js"></script>
-
+<script>
+(function(){
+    var s = document.createElement('script');
+    var host = 'mapy' + '.geoportal.gov.pl';
+    s.src = 'https://' + host + '/iMapLite/api/cdn/2.0.0/imgp-map/imap-lite-api.js';
+    document.head.appendChild(s);
+})();
+</script>
 </head>
 <body>
 
 <div id="panel">
+    <b>Podklad</b>
+    <div class="basemap-row">
+        <label><input type="radio" name="bm" value="G2:ORTO" checked><span>ORTO</span></label>
+        <label><input type="radio" name="bm" value="G2:TOPO"><span>TOPO</span></label>
+    </div>
+
+    <hr>
     <b>Szukaj adresu</b>
     <input id="address" type="text" placeholder="np. Poznan Ratajczaka 39" autocomplete="off">
     <div id="suggestions"></div>
 
     <hr>
-
     <b>Wspolrzedne</b>
     <input id="lat" type="text" placeholder="Lat">
     <input id="lng" type="text" placeholder="Lng">
     <button onclick="ustawMarker()">Pokaz na mapie</button>
-    <div id="info">Klik na mape = wspolrzedne tutaj</div>
+    <div id="info">Klik na mape = wspolrzedne tutaj. Numery widoczne od zoom ~15.</div>
 </div>
 
 <imgp-map
@@ -59,112 +80,77 @@ body { margin:0; font-family: sans-serif; }
 
 <script>
 document.addEventListener("WebComponentsReady", function() {
-
     var imap = document.getElementById("mapa");
     var map = imap.map;
     var marker = null;
-
     var crs2180 = map.options.crs;
 
-    // ✅ KLUCZ: version: '1.1.1' (bo 1.3.0 przekrecal osie X,Y)
-    // Dzialki ewidencyjne (z numerami)
-    var dzialki = L.tileLayer.wms(
-        'https://integracja.gugik.gov.pl/cgi-bin/KrajowaIntegracjaEwidencjiGruntow',
-        {
-            layers: 'dzialki,numery_dzialek',
-            format: 'image/png',
-            transparent: true,
-            version: '1.1.1',
-            crs: crs2180,
-            attribution: 'GUGiK - KIEG',
-            opacity: 0.9,
-            keepBuffer: 8,
-            crossOrigin: true
-        }
-    );
+    // PRZELACZNIK PODKLADU
+    document.querySelectorAll('input[name="bm"]').forEach(function(rb){
+        rb.addEventListener('change', function(){
+            if (!this.checked) return;
+            try { imap.setAttribute('basemap', this.value); }
+            catch(e) { console.warn("Basemap switch failed", e); }
+        });
+    });
 
-    // Budynki ewidencyjne (obrysy)
-    var budynki = L.tileLayer.wms(
-        'https://integracja.gugik.gov.pl/cgi-bin/KrajowaIntegracjaEwidencjiGruntow',
-        {
-            layers: 'budynki',
-            format: 'image/png',
-            transparent: true,
-            version: '1.1.1',
-            crs: crs2180,
-            attribution: 'GUGiK - KIEG',
-            opacity: 0.85,
-            keepBuffer: 8,
-            crossOrigin: true
-        }
-    );
+    // === URL-e usług ===
+    var KIEG_URL  = 'https://integracja.gugik.gov.pl/cgi-bin/KrajowaIntegracjaEwidencjiGruntow';
+    var KINA_URL  = 'https://mapy.geoportal.gov.pl/wss/ext/KrajowaIntegracjaNumeracjiAdresowej';
+    var PRG_BOUND = 'https://mapy.geoportal.gov.pl/wss/service/PZGIK/PRG/WMS/AdministrativeBoundaries';
 
-    // Granice gmin (PRG)
-    var graniceGmin = L.tileLayer.wms(
-        'https://mapy.geoportal.gov.pl/wss/service/PZGIK/PRG/WMS/AdministrativeBoundaries',
-        {
-            layers: 'A03_Granice_gmin',
-            format: 'image/png',
-            transparent: true,
-            version: '1.1.1',
-            crs: crs2180,
-            attribution: 'Geoportal - PRG',
-            opacity: 0.7,
-            keepBuffer: 4,
-            crossOrigin: true
-        }
-    );
+    // === WARSTWY ===
+    var dzialki = L.tileLayer.wms(KIEG_URL,
+        { layers:'dzialki,numery_dzialek', format:'image/png', transparent:true,
+          version:'1.1.1', crs:crs2180, attribution:'GUGiK - KIEG',
+          opacity:0.9, keepBuffer:8, crossOrigin:true });
 
-    // Granice powiatow (PRG)
-    var granicePowiatow = L.tileLayer.wms(
-        'https://mapy.geoportal.gov.pl/wss/service/PZGIK/PRG/WMS/AdministrativeBoundaries',
-        {
-            layers: 'A02_Granice_powiatow',
-            format: 'image/png',
-            transparent: true,
-            version: '1.1.1',
-            crs: crs2180,
-            attribution: 'Geoportal - PRG',
-            opacity: 0.7,
-            keepBuffer: 4,
-            crossOrigin: true
-        }
-    );
+    var budynki = L.tileLayer.wms(KIEG_URL,
+        { layers:'budynki', format:'image/png', transparent:true,
+          version:'1.1.1', crs:crs2180, attribution:'GUGiK - KIEG',
+          opacity:0.85, keepBuffer:8, crossOrigin:true });
 
-    // Adresy (PRG)
-    var adresy = L.tileLayer.wms(
-        'https://mapy.geoportal.gov.pl/wss/service/PZGIK/PRG/WMS/AdresyOrazUliceIDrogi',
-        {
-            layers: 'prg-adresy',
-            format: 'image/png',
-            transparent: true,
-            version: '1.1.1',
-            crs: crs2180,
-            attribution: 'Geoportal - PRG Adresy',
-            opacity: 0.9,
-            keepBuffer: 4,
-            crossOrigin: true
-        }
-    );
+    // ⭐ NUMERY ADRESOWE — KINA (publiczna usluga GUGiK)
+    var numeryAdresowe = L.tileLayer.wms(KINA_URL,
+        { layers:'prg-adresy', format:'image/png', transparent:true,
+          version:'1.1.1', crs:crs2180,
+          attribution:'GUGiK - Krajowa Integracja Numeracji Adresowej',
+          opacity:1.0, keepBuffer:8, crossOrigin:true });
+
+    var ulice = L.tileLayer.wms(KINA_URL,
+        { layers:'prg-ulice', format:'image/png', transparent:true,
+          version:'1.1.1', crs:crs2180,
+          attribution:'GUGiK - KINA (ulice)',
+          opacity:0.9, keepBuffer:8, crossOrigin:true });
+
+    var graniceGmin = L.tileLayer.wms(PRG_BOUND,
+        { layers:'A03_Granice_gmin', format:'image/png', transparent:true,
+          version:'1.1.1', crs:crs2180, attribution:'Geoportal - PRG',
+          opacity:0.7, keepBuffer:4, crossOrigin:true });
+
+    var granicePowiatow = L.tileLayer.wms(PRG_BOUND,
+        { layers:'A02_Granice_powiatow', format:'image/png', transparent:true,
+          version:'1.1.1', crs:crs2180, attribution:'Geoportal - PRG',
+          opacity:0.7, keepBuffer:4, crossOrigin:true });
 
     L.control.layers(
         {},
         {
             "Dzialki + numery": dzialki,
             "Budynki (obrysy)": budynki,
+            "Numery adresowe": numeryAdresowe,
+            "Ulice (z nazwami)": ulice,
             "Granice gmin": graniceGmin,
-            "Granice powiatow": granicePowiatow,
-            "Adresy (PRG)": adresy
+            "Granice powiatow": granicePowiatow
         },
         { collapsed: false }
     ).addTo(map);
 
     dzialki.addTo(map);
     budynki.addTo(map);
+    numeryAdresowe.addTo(map);  // wlaczone domyslnie
 
-    // =========================
     // MARKER + FORMULARZ
-    // =========================
     function ustawMarkerNaMapie(lat, lng, popupTekst) {
         lat = parseFloat(lat); lng = parseFloat(lng);
         if (isNaN(lat) || isNaN(lng)) { alert("Niepoprawne wspolrzedne!"); return; }
@@ -173,7 +159,7 @@ document.addEventListener("WebComponentsReady", function() {
         marker.bindPopup(
             popupTekst || ("Lat: " + lat.toFixed(6) + "<br>Lng: " + lng.toFixed(6))
         ).openPopup();
-        map.setView([lat, lng], 14);
+        map.setView([lat, lng], 17);
     }
 
     map.on('click', function(e) {
@@ -189,9 +175,7 @@ document.addEventListener("WebComponentsReady", function() {
         );
     };
 
-    // =========================
-    // SZUKAJKA ADRESOW
-    // =========================
+    // SZUKAJKA
     var addressInput = document.getElementById("address");
     var suggestionsBox = document.getElementById("suggestions");
     var debounceTimer = null;
@@ -254,9 +238,8 @@ document.addEventListener("WebComponentsReady", function() {
         }
     });
 
-    console.log("iMapLite + warstwy (WMS 1.1.1) ready", map);
+    console.log("iMapLite + KINA numery adresowe ready", map);
 });
 </script>
-
 </body>
 </html>
