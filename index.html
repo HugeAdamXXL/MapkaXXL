@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Mapa Geoportal</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        body { margin:0; }
+        #map { height:100vh; }
+
+        #panel {
+            position: absolute;
+            top: 10px;
+            left: 140px;
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        }
+
+        #panel input {
+            width: 120px;
+            margin-bottom: 5px;
+        }
+
+        #panel button {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+<div id="panel">
+    <div><b>Wprowadź współrzędne</b></div>
+    <input id="lat" type="text" placeholder="Lat">
+    <br>
+    <input id="lng" type="text" placeholder="Lng">
+    <br>
+    <button onclick="ustawMarker()">Pokaż</button>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    var map = L.map('map').setView([52.1, 17.0], 6);
+
+    // =========================
+    // WARSTWY
+    // =========================
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+
+    var orto = L.tileLayer.wms(
+        'https://mapy.geoportal.gov.pl/wss/service/PZGIK/ORTO/WMS/StandardResolution',
+        {
+            layers: 'ORTOFOTOMAPA',
+            format: 'image/png'
+        }
+    );
+
+    // ✅ DZIAŁKI (EGiB)
+    var dzialki = L.tileLayer.wms(
+        'https://mapy.geoportal.gov.pl/wss/service/PZGIK/KrajowaIntegracjaEwidencjiGruntow',
+        {
+            layers: 'dzialki',
+            format: 'image/png',
+            transparent: true
+        }
+    );
+
+    // ✅ BUDYNKI
+    var budynki = L.tileLayer.wms(
+        'https://mapy.geoportal.gov.pl/wss/service/PZGIK/KrajowaIntegracjaEwidencjiGruntow',
+        {
+            layers: 'budynki',
+            format: 'image/png',
+            transparent: true
+        }
+    );
+
+    // ✅ GRANICE (opcjonalnie)
+    var granice = L.tileLayer.wms(
+        'https://mapy.geoportal.gov.pl/wss/service/PZGIK/PRG/WMS',
+        {
+            layers: 'A03_Granice_gmin',
+            format: 'image/png',
+            transparent: true
+        }
+    );
+
+    osm.addTo(map);
+
+    L.control.layers(
+        {
+            "OSM": osm,
+            "Orto (Geoportal)": orto
+        },
+        {
+            "Działki": dzialki,
+            "Budynki": budynki,
+            "Granice gmin": granice
+        }
+    ).addTo(map);
+
+    // =========================
+    // MARKER
+    // =========================
+    var marker;
+
+    function ustawMarkerNaMapie(lat, lng) {
+
+        lat = parseFloat(lat);
+        lng = parseFloat(lng);
+
+        if (isNaN(lat) || isNaN(lng)) {
+            alert("Niepoprawne współrzędne!");
+            return;
+        }
+
+        if (marker) {
+            map.removeLayer(marker);
+        }
+
+        marker = L.marker([lat, lng]).addTo(map);
+
+        marker.bindPopup(
+            "<b>Współrzędne:</b><br>" +
+            "Lat: " + lat.toFixed(6) + "<br>" +
+            "Lng: " + lng.toFixed(6)
+        ).openPopup();
+
+        map.setView([lat, lng], 17);
+    }
+
+    map.on('click', function(e) {
+        var lat = e.latlng.lat.toFixed(6);
+        var lng = e.latlng.lng.toFixed(6);
+
+        document.getElementById("lat").value = lat;
+        document.getElementById("lng").value = lng;
+
+        ustawMarkerNaMapie(lat, lng);
+    });
+
+    function ustawMarker() {
+        var lat = document.getElementById("lat").value;
+        var lng = document.getElementById("lng").value;
+
+        ustawMarkerNaMapie(lat, lng);
+    }
+
+</script>
+
+</body>
+</html>
