@@ -2,40 +2,207 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<title>Mapa iMapLite — ORTO/TOPO + numery adresowe</title>
+<title>Lokalizacja na mapie</title>
 <style>
-body { margin:0; font-family: sans-serif; }
-#panel {
-    position: absolute; top: 10px; left: 60px;
-    z-index: 9999; background: white; padding: 10px;
-    border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.2);
-    width: 280px;
+:root {
+    --bg: #f0f2f5;
+    --card: #ffffff;
+    --border: #e0e3e7;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --primary: #1976d2;
+    --primary-hover: #1565c0;
+    --disabled: #f5f5f5;
 }
-#panel input[type="text"] { width: 100%; box-sizing: border-box; margin-bottom: 5px; padding: 4px; }
-#panel button { width: 100%; padding: 4px; cursor: pointer; }
-#panel hr { margin: 10px 0; border: none; border-top: 1px solid #ddd; }
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+/* === MODAL / KARTA === */
+.modal {
+    background: var(--card);
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+    width: 100%;
+    max-width: 900px;
+    display: flex;
+    flex-direction: column;
+    max-height: 95vh;
+    overflow: hidden;
+}
+.modal-header {
+    padding: 20px 28px 16px;
+    border-bottom: 1px solid var(--border);
+}
+.modal-header h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+.modal-body {
+    padding: 20px 28px;
+    overflow-y: auto;
+}
+.modal-footer {
+    padding: 16px 28px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    background: #fafbfc;
+}
+
+/* === POLA FORMULARZA === */
+.field {
+    position: relative;
+    margin-bottom: 14px;
+}
+.field label {
+    position: absolute;
+    top: -8px; left: 12px;
+    background: var(--card);
+    padding: 0 6px;
+    font-size: 12px;
+    color: var(--muted);
+    pointer-events: none;
+}
+.field.disabled label { background: linear-gradient(180deg, var(--card) 50%, var(--disabled) 50%); }
+.field input {
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--card);
+    font-family: inherit;
+    color: var(--text);
+}
+.field input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(25,118,210,0.15);
+}
+.field input:disabled, .field input[readonly] {
+    background: var(--disabled);
+    color: #555;
+    cursor: not-allowed;
+}
+.field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+/* === SUGESTIE ADRESOWE === */
 #suggestions {
-    background: white; border: 1px solid #ccc;
-    max-height: 220px; overflow-y: auto;
-    display: none; margin-top: -5px; margin-bottom: 5px;
+    position: absolute;
+    top: 100%; left: 0; right: 0;
+    background: white;
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 100;
+    display: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 #suggestions div {
-    padding: 5px 8px; cursor: pointer;
-    border-bottom: 1px solid #eee; font-size: 13px;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 13px;
 }
 #suggestions div:hover { background: #f0f6ff; }
-#suggestions .empty { color: #777; cursor: default; }
-#suggestions .err   { color: #900; cursor: default; }
-#info { font-size: 12px; color: #555; margin-top: 5px; }
-.basemap-row { display:flex; gap:6px; margin-bottom:6px; }
-.basemap-row label {
-    flex:1; text-align:center; font-size:12px;
-    padding:6px 0; border:1px solid #ccc; border-radius:4px;
-    cursor:pointer; background:#fafafa;
+#suggestions div:last-child { border-bottom: none; }
+#suggestions .empty, #suggestions .err, #suggestions .hint {
+    color: var(--muted);
+    cursor: default;
+    font-style: italic;
 }
-.basemap-row input { display:none; }
+#suggestions .err { color: #c62828; }
+
+/* === MAPA === */
+.map-container {
+    position: relative;
+    margin-top: 6px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: #e8ecef;
+}
+imgp-map {
+    width: 100%;
+    height: 420px;
+    display: block;
+}
+.basemap-row {
+    position: absolute;
+    top: 10px; right: 10px;
+    z-index: 500;
+    display: flex;
+    gap: 4px;
+    background: white;
+    padding: 4px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.basemap-row label {
+    font-size: 12px;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    background: #fafafa;
+    border: 1px solid transparent;
+}
+.basemap-row input { display: none; }
 .basemap-row label:has(input:checked) {
-    background:#1976d2; border-color:#1976d2; color:white;
+    background: var(--primary);
+    color: white;
+}
+
+/* === BUTTONY === */
+.btn {
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    font-family: inherit;
+    transition: all 0.15s;
+}
+.btn-secondary {
+    background: white;
+    color: var(--text);
+    border-color: var(--border);
+}
+.btn-secondary:hover { background: #f5f5f5; }
+.btn-primary {
+    background: var(--primary);
+    color: white;
+}
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-primary:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+/* === TŁO STRONY (opcjonalne) === */
+.page-hint {
+    position: fixed;
+    top: 10px; left: 10px;
+    font-size: 11px;
+    color: var(--muted);
 }
 </style>
 <script>
@@ -49,34 +216,67 @@ body { margin:0; font-family: sans-serif; }
 </head>
 <body>
 
-<div id="panel">
-    <b>Podklad</b>
-    <div class="basemap-row">
-        <label><input type="radio" name="bm" value="G2:ORTO" checked><span>ORTO</span></label>
-        <label><input type="radio" name="bm" value="G2:TOPO"><span>TOPO</span></label>
+<div class="page-hint">Wersja standalone — makieta modala „Lokalizacja na mapie"</div>
+
+<div class="modal">
+    <div class="modal-header">
+        <h2>Lokalizacja na mapie</h2>
     </div>
 
-    <hr>
-    <b>Szukaj adresu</b>
-    <input id="address" type="text" placeholder="np. Poznan Ratajczaka 39" autocomplete="off">
-    <div id="suggestions"></div>
+    <div class="modal-body">
+        <!-- Wyszukiwarka adresu -->
+        <div class="field">
+            <label for="address">Wyszukaj adres aby pobrac koordynaty</label>
+            <input id="address" type="text" placeholder="np. Poznan Ratajczaka 39" autocomplete="off">
+            <div id="suggestions"></div>
+        </div>
 
-    <hr>
-    <b>Wspolrzedne</b>
-    <input id="lat" type="text" placeholder="Lat">
-    <input id="lng" type="text" placeholder="Lng">
-    <button onclick="ustawMarker()">Pokaz na mapie</button>
-    <div id="info">Klik na mape = wspolrzedne tutaj. Numery widoczne od zoom ~15.</div>
+        <!-- Aktualne (readonly) -->
+        <div class="field-row">
+            <div class="field disabled">
+                <label for="latAktualny">Aktualna szerokosc geograficzna</label>
+                <input id="latAktualny" type="text" readonly value="50.400302">
+            </div>
+            <div class="field disabled">
+                <label for="lngAktualny">Aktualna dlugosc geograficzna</label>
+                <input id="lngAktualny" type="text" readonly value="21.038294">
+            </div>
+        </div>
+
+        <!-- Nowe (editable) -->
+        <div class="field-row">
+            <div class="field">
+                <label for="lat">Nowa szerokosc geograficzna</label>
+                <input id="lat" type="text" placeholder="—">
+            </div>
+            <div class="field">
+                <label for="lng">Nowa dlugosc geograficzna</label>
+                <input id="lng" type="text" placeholder="—">
+            </div>
+        </div>
+
+        <!-- Mapa z pływającym przełącznikiem podkładu -->
+        <div class="map-container">
+            <div class="basemap-row">
+                <label><input type="radio" name="bm" value="G2:ORTO" checked><span>ORTO</span></label>
+                <label><input type="radio" name="bm" value="G2:TOPO"><span>TOPO</span></label>
+            </div>
+
+            <imgp-map
+                id="mapa"
+                zoom="10"
+                center="[52.4, 16.9]"
+                epsg="2180:G2"
+                basemap="G2:ORTO">
+            </imgp-map>
+        </div>
+    </div>
+
+    <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="anuluj()">Anuluj</button>
+        <button class="btn btn-primary" id="btnZapisz" onclick="zapisz()">Zapisz</button>
+    </div>
 </div>
-
-<imgp-map
-    id="mapa"
-    style="width:100%; height:100vh;"
-    zoom="10"
-    center="[52.4, 16.9]"
-    epsg="2180:G2"
-    basemap="G2:ORTO">
-</imgp-map>
 
 <script>
 document.addEventListener("WebComponentsReady", function() {
@@ -85,7 +285,7 @@ document.addEventListener("WebComponentsReady", function() {
     var marker = null;
     var crs2180 = map.options.crs;
 
-    // PRZELACZNIK PODKLADU
+    // === PRZELACZNIK PODKLADU ===
     document.querySelectorAll('input[name="bm"]').forEach(function(rb){
         rb.addEventListener('change', function(){
             if (!this.checked) return;
@@ -110,17 +310,14 @@ document.addEventListener("WebComponentsReady", function() {
           version:'1.1.1', crs:crs2180, attribution:'GUGiK - KIEG',
           opacity:0.85, keepBuffer:8, crossOrigin:true });
 
-    // ⭐ NUMERY ADRESOWE — KINA (publiczna usluga GUGiK)
     var numeryAdresowe = L.tileLayer.wms(KINA_URL,
         { layers:'prg-adresy', format:'image/png', transparent:true,
-          version:'1.1.1', crs:crs2180,
-          attribution:'GUGiK - Krajowa Integracja Numeracji Adresowej',
+          version:'1.1.1', crs:crs2180, attribution:'GUGiK - KINA',
           opacity:1.0, keepBuffer:8, crossOrigin:true });
 
     var ulice = L.tileLayer.wms(KINA_URL,
         { layers:'prg-ulice', format:'image/png', transparent:true,
-          version:'1.1.1', crs:crs2180,
-          attribution:'GUGiK - KINA (ulice)',
+          version:'1.1.1', crs:crs2180, attribution:'GUGiK - KINA',
           opacity:0.9, keepBuffer:8, crossOrigin:true });
 
     var graniceGmin = L.tileLayer.wms(PRG_BOUND,
@@ -133,49 +330,57 @@ document.addEventListener("WebComponentsReady", function() {
           version:'1.1.1', crs:crs2180, attribution:'Geoportal - PRG',
           opacity:0.7, keepBuffer:4, crossOrigin:true });
 
-    L.control.layers(
-        {},
-        {
-            "Dzialki + numery": dzialki,
-            "Budynki (obrysy)": budynki,
-            "Numery adresowe": numeryAdresowe,
-            "Ulice (z nazwami)": ulice,
-            "Granice gmin": graniceGmin,
-            "Granice powiatow": granicePowiatow
-        },
-        { collapsed: false }
-    ).addTo(map);
+    L.control.layers({}, {
+        "Dzialki + numery": dzialki,
+        "Budynki (obrysy)": budynki,
+        "Numery adresowe": numeryAdresowe,
+        "Ulice (z nazwami)": ulice,
+        "Granice gmin": graniceGmin,
+        "Granice powiatow": granicePowiatow
+    }, { collapsed: true, position: 'topleft' }).addTo(map);
 
     dzialki.addTo(map);
     budynki.addTo(map);
-    numeryAdresowe.addTo(map);  // wlaczone domyslnie
+    numeryAdresowe.addTo(map);
 
-    // MARKER + FORMULARZ
-    function ustawMarkerNaMapie(lat, lng, popupTekst) {
+    // === Ustawianie startowe: wstaw marker w miejscu "aktualnym" ===
+    var latStart = parseFloat(document.getElementById("latAktualny").value);
+    var lngStart = parseFloat(document.getElementById("lngAktualny").value);
+    if (!isNaN(latStart) && !isNaN(lngStart)) {
+        marker = L.marker([latStart, lngStart]).addTo(map);
+        map.setView([latStart, lngStart], 17);
+    }
+
+    // === MARKER + KLIK MAPA ===
+    function ustawMarkerNaMapie(lat, lng, popupTekst, updateInputs) {
         lat = parseFloat(lat); lng = parseFloat(lng);
         if (isNaN(lat) || isNaN(lng)) { alert("Niepoprawne wspolrzedne!"); return; }
         if (marker) map.removeLayer(marker);
         marker = L.marker([lat, lng]).addTo(map);
-        marker.bindPopup(
-            popupTekst || ("Lat: " + lat.toFixed(6) + "<br>Lng: " + lng.toFixed(6))
-        ).openPopup();
+        if (popupTekst) marker.bindPopup(popupTekst).openPopup();
         map.setView([lat, lng], 17);
+        if (updateInputs !== false) {
+            document.getElementById("lat").value = lat.toFixed(6);
+            document.getElementById("lng").value = lng.toFixed(6);
+        }
     }
 
     map.on('click', function(e) {
-        document.getElementById("lat").value = e.latlng.lat.toFixed(6);
-        document.getElementById("lng").value = e.latlng.lng.toFixed(6);
         ustawMarkerNaMapie(e.latlng.lat, e.latlng.lng);
     });
 
-    window.ustawMarker = function() {
-        ustawMarkerNaMapie(
-            document.getElementById("lat").value,
-            document.getElementById("lng").value
-        );
-    };
+    // Reagowanie na ręczne wpisanie w pola "Nowe"
+    ["lat","lng"].forEach(function(id){
+        document.getElementById(id).addEventListener("change", function(){
+            var lat = parseFloat(document.getElementById("lat").value);
+            var lng = parseFloat(document.getElementById("lng").value);
+            if (!isNaN(lat) && !isNaN(lng)) {
+                ustawMarkerNaMapie(lat, lng, null, false);
+            }
+        });
+    });
 
-    // SZUKAJKA
+    // === SZUKAJKA ===
     var addressInput = document.getElementById("address");
     var suggestionsBox = document.getElementById("suggestions");
     var debounceTimer = null;
@@ -223,10 +428,7 @@ document.addEventListener("WebComponentsReady", function() {
         var lng = parseFloat(item.lon);
         if (isNaN(lat) || isNaN(lng)) { alert("Brak wspolrzednych"); return; }
         var krotki = item.display_name.split(",").slice(0, 3).join(", ");
-        var popis = "<b>" + krotki + "</b><br>"
-                  + "<small>" + lat.toFixed(6) + ", " + lng.toFixed(6) + "</small>";
-        document.getElementById("lat").value = lat.toFixed(6);
-        document.getElementById("lng").value = lng.toFixed(6);
+        var popis = "<b>Nowa lokalizacja</b><br><small>" + krotki + "</small>";
         ustawMarkerNaMapie(lat, lng, popis);
         suggestionsBox.style.display = "none";
         addressInput.value = krotki;
@@ -238,7 +440,34 @@ document.addEventListener("WebComponentsReady", function() {
         }
     });
 
-    console.log("iMapLite + KINA numery adresowe ready", map);
+    // === PRZYCISKI ===
+    window.anuluj = function() {
+        if (confirm("Anulowac zmiany?")) {
+            document.getElementById("lat").value = "";
+            document.getElementById("lng").value = "";
+            addressInput.value = "";
+            // przywroc marker na "aktualne"
+            var la = parseFloat(document.getElementById("latAktualny").value);
+            var ln = parseFloat(document.getElementById("lngAktualny").value);
+            if (!isNaN(la) && !isNaN(ln)) ustawMarkerNaMapie(la, ln, null, false);
+        }
+    };
+
+    window.zapisz = function() {
+        var lat = document.getElementById("lat").value;
+        var lng = document.getElementById("lng").value;
+        if (!lat || !lng) {
+            alert("Wskaz nowa lokalizacje na mapie lub wpisz wspolrzedne recznie.");
+            return;
+        }
+        alert("Zapisano nowe wspolrzedne:\n" + lat + ", " + lng
+            + "\n\n(W realnej aplikacji tu leci POST/PUT do backendu)");
+        // przenies "nowe" do "aktualnych"
+        document.getElementById("latAktualny").value = lat;
+        document.getElementById("lngAktualny").value = lng;
+    };
+
+    console.log("Lokalizacja na mapie — modal gotowy", map);
 });
 </script>
 </body>
